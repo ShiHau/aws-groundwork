@@ -12,7 +12,7 @@ resource "aws_vpc" "groundwork_vpc" {
   enable_dns_support   = true
 
   tags = {
-    Name = "groundwork-vpc"
+    Name    = "groundwork-vpc"
     Project = "groundwork"
   }
 }

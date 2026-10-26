@@ -1,9 +1,19 @@
-output "rds_security_group_id" {
-    description = "rds security group"
-    value = aws_security_group.rds_security_group.id
+output "rds_endpoint" {
+  description = "RDS instance hostname (without port)"
+  value       = aws_db_instance.rds_instance.address
 }
 
-output "rds_endpoint" {
-  description = "rds instance endpoint"
-  value = aws_db_instance.rds_instance.endpoint
+output "db_resource_id" {
+  description = "RDS DbiResourceId (used in rds-db:connect ARNs)"
+  value       = aws_db_instance.rds_instance.resource_id
+}
+
+output "master_secret_arn" {
+  description = "ARN of the RDS-managed master user secret"
+  value       = aws_db_instance.rds_instance.master_user_secret[0].secret_arn
+}
+
+output "master_username" {
+  description = "RDS master username"
+  value       = aws_db_instance.rds_instance.username
 }

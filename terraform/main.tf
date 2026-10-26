@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "ap-southeast-1"
+  region = var.region
 }
 
 module "groundwork_vpc" {
@@ -17,7 +17,7 @@ module "groundwork_networking" {
 
   vpc_id     = module.groundwork_vpc.vpc_id
   subnet_ids = module.groundwork_vpc.private_subnet_ids
-  region     = "ap-southeast-1"
+  region     = var.region
 }
 
 module "groundwork_rds" {
@@ -26,11 +26,12 @@ module "groundwork_rds" {
   rds_security_group_id = module.groundwork_networking.rds_security_group_id
   subnet_ids            = module.groundwork_vpc.private_subnet_ids
   instance_class        = "db.t4g.micro"
-  db_name               = "groundwork_rds_db"
+  db_name               = var.db_name
   engine_version        = "18.3"
   allocated_storage     = 20
 }
 
+# Creates the database users and the tickets table. Runs as the RDS master user.
 module "groundwork_bootstrap" {
   source = "./bootstrap_lambda_rds"
 
@@ -38,7 +39,7 @@ module "groundwork_bootstrap" {
   subnet_ids                  = module.groundwork_vpc.private_subnet_ids
   bootstrap_security_group_id = module.groundwork_networking.bootstrap_security_group_id
   rds_endpoint                = module.groundwork_rds.rds_endpoint
-  db_name                     = "groundwork_rds_db"
+  db_name                     = var.db_name
   master_username             = module.groundwork_rds.master_username
   master_secret_arn           = module.groundwork_rds.master_secret_arn
 
@@ -46,40 +47,40 @@ module "groundwork_bootstrap" {
   depends_on = [module.groundwork_networking]
 }
 
+# Writer: can only INSERT into tickets (as lambda_user).
 module "groundwork_lambda" {
-  source = "./app_lambda"
+  source = "./db_lambda"
 
-  # The application must not be ready before lambda_user and the tickets table exist.
+  # lambda_user and the tickets table must exist first.
   depends_on = [module.groundwork_bootstrap]
 
-  region                   = "ap-southeast-1"
-  lambda_security_group_id = module.groundwork_networking.lambda_app_security_group_id
-  subnet_ids               = module.groundwork_vpc.private_subnet_ids
-  lambda_name              = "groundwork_lambda_worker"
-  source_dir               = abspath("${path.root}/../build/app_lambda")
-  handler                  = "main.lambda_handler"
-  runtime                  = "python3.12"
-  db_name                  = "groundwork_rds_db"
-  rds_endpoint             = module.groundwork_rds.rds_endpoint
-  db_resource_id           = module.groundwork_rds.db_resource_id
-  rds_security_group_id    = module.groundwork_networking.rds_security_group_id
+  region            = var.region
+  lambda_name       = "groundwork_lambda_worker"
+  source_dir        = abspath("${path.root}/../build/app_lambda")
+  handler           = "main.lambda_handler"
+  subnet_ids        = module.groundwork_vpc.private_subnet_ids
+  security_group_id = module.groundwork_networking.lambda_app_security_group_id
+  db_name           = var.db_name
+  db_user           = "lambda_user"
+  rds_endpoint      = module.groundwork_rds.rds_endpoint
+  db_resource_id    = module.groundwork_rds.db_resource_id
 }
 
+# Reader: can only SELECT from tickets (as reader_user).
 module "groundwork_reader" {
-  source = "./reader_lambda"
+  source = "./db_lambda"
 
-  # reader_user is created by the bootstrap.
+  # reader_user must exist first.
   depends_on = [module.groundwork_bootstrap]
 
-  region                   = "ap-southeast-1"
-  lambda_security_group_id = module.groundwork_networking.lambda_reader_security_group_id
-  subnet_ids               = module.groundwork_vpc.private_subnet_ids
-  lambda_name              = "groundwork_lambda_reader"
-  source_dir               = abspath("${path.root}/../build/reader")
-  handler                  = "handler.lambda_handler"
-  runtime                  = "python3.12"
-  db_name                  = "groundwork_rds_db"
-  rds_endpoint             = module.groundwork_rds.rds_endpoint
-  db_resource_id           = module.groundwork_rds.db_resource_id
-  rds_security_group_id    = module.groundwork_networking.rds_security_group_id
+  region            = var.region
+  lambda_name       = "groundwork_lambda_reader"
+  source_dir        = abspath("${path.root}/../build/reader")
+  handler           = "handler.lambda_handler"
+  subnet_ids        = module.groundwork_vpc.private_subnet_ids
+  security_group_id = module.groundwork_networking.lambda_reader_security_group_id
+  db_name           = var.db_name
+  db_user           = "reader_user"
+  rds_endpoint      = module.groundwork_rds.rds_endpoint
+  db_resource_id    = module.groundwork_rds.db_resource_id
 }

@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AWS Lambda build artifacts (build/ is already ignored above)
+/terraform/app_lambda/function.zip
+/terraform/bootstrap_lambda_rds/function.zip
+/terraform/reader_lambda/function.zip

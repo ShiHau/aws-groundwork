@@ -10,6 +10,13 @@ CA_BUNDLE = os.path.join(os.path.dirname(__file__), "global-bundle.pem")
 LIMIT = 20
 
 
+def _mask_email(email):
+    # test@example.com -> te**********.com
+    if len(email) <= 6:
+        return email[:1] + "*" * (len(email) - 1)
+    return email[:2] + "*" * (len(email) - 6) + email[-4:]
+
+
 def _connect():
     host = os.environ["db_endpoint"]
     token = boto3.client("rds", region_name=os.environ["AWS_REGION"]).generate_db_auth_token(
@@ -37,7 +44,7 @@ def lambda_handler(event, context):
                 (LIMIT,),
             )
             tickets = [
-                {"id": r[0], "email": r[1], "message": r[2], "created_at": r[3].isoformat()}
+                {"id": r[0], "email": _mask_email(r[1]), "message": r[2], "created_at": r[3].isoformat()}
                 for r in cur.fetchall()
             ]
     except psycopg2.Error as exc:

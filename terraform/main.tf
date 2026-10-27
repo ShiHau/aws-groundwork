@@ -84,3 +84,21 @@ module "groundwork_reader" {
   rds_endpoint      = module.groundwork_rds.rds_endpoint
   db_resource_id    = module.groundwork_rds.db_resource_id
 }
+
+module "groundwork_api_gateway" {
+  source = "./api_gateway"
+
+  api_name = "groundwork-api"
+
+  # Add a new endpoint by adding one entry here.
+  routes = {
+    "POST /ticket" = {
+      lambda_invoke_arn    = module.groundwork_lambda.lambda_invoke_arn
+      lambda_function_name = module.groundwork_lambda.lambda_function_name
+    }
+    "GET /ticket" = {
+      lambda_invoke_arn    = module.groundwork_reader.lambda_invoke_arn
+      lambda_function_name = module.groundwork_reader.lambda_function_name
+    }
+  }
+}

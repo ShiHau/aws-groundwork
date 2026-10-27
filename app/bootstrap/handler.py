@@ -11,6 +11,7 @@ import boto3
 import psycopg2
 
 SQL_PATH = Path(__file__).with_name("rds_bootstrap.sql")
+CA_BUNDLE = os.path.join(os.path.dirname(__file__), "global-bundle.pem")
 
 
 def get_master_password():
@@ -25,7 +26,8 @@ def lambda_handler(event, context):
         dbname=os.environ["db_name"],
         user=os.environ["db_user"],
         password=get_master_password(),
-        sslmode="require",
+        sslmode="verify-full",
+        sslrootcert=CA_BUNDLE,
         connect_timeout=10,
     )
     try:

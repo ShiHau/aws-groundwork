@@ -19,8 +19,8 @@ for name in app_lambda bootstrap reader; do
   find "app/$name" -maxdepth 1 -type f -exec cp {} "build/$name/" \;
 done
 
-# CA bundle so the app lambda can use sslmode=verify-full against RDS
-for name in app_lambda reader; do
+# CA bundle so the lambda functions can use sslmode=verify-full against RDS
+for name in app_lambda bootstrap reader; do
   curl -fsSL -o "build/$name/global-bundle.pem" \
     https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 done

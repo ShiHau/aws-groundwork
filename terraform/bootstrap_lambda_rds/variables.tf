@@ -56,3 +56,9 @@ variable "master_secret_arn" {
   description = "arn of the RDS-managed master user secret"
   type        = string
 }
+
+variable "log_retention_days" {
+  description = "days to keep the bootstrap lambda's CloudWatch logs"
+  type        = number
+  default     = 7
+}

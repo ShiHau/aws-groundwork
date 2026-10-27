@@ -1,8 +1,14 @@
 import json
+import logging
 import os
+import time
 
 import boto3
 import psycopg2
+
+# See app_lambda/main.py: the Lambda runtime renders these as JSON when log_format is JSON.
+logger = logging.getLogger(__name__)
+logging.getLogger("botocore").setLevel(logging.WARNING)
 
 DB_USER = "reader_user"
 DB_PORT = 5432
@@ -34,7 +40,24 @@ def _connect():
     )
 
 
+def _request_fields(event):
+    request_context = event.get("requestContext") or {}
+    return {"apiRequestId": request_context.get("requestId"), "route": event.get("routeKey")}
+
+
+def _db_error_fields(exc):
+    # Only the first line of the server message: DETAIL lines can echo row values (i.e. user data).
+    message = str(exc).strip().splitlines()
+    return {
+        "dbErrorType": type(exc).__name__,
+        "pgcode": exc.pgcode,
+        "dbErrorMessage": message[0] if message else None,
+    }
+
+
 def lambda_handler(event, context):
+    fields = _request_fields(event)
+    started = time.perf_counter()
     conn = None
     try:
         conn = _connect()
@@ -48,7 +71,16 @@ def lambda_handler(event, context):
                 for r in cur.fetchall()
             ]
     except psycopg2.Error as exc:
-        print(f"database error: {type(exc).__name__}")
+        logger.error(
+            "database error",
+            extra={
+                **fields,
+                **_db_error_fields(exc),
+                "outcome": "error",
+                "status": 500,
+                "dbDurationMs": round((time.perf_counter() - started) * 1000),
+            },
+        )
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
@@ -58,6 +90,16 @@ def lambda_handler(event, context):
         if conn is not None:
             conn.close()
 
+    logger.info(
+        "tickets read",
+        extra={
+            **fields,
+            "outcome": "read",
+            "status": 200,
+            "ticketCount": len(tickets),
+            "dbDurationMs": round((time.perf_counter() - started) * 1000),
+        },
+    )
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},

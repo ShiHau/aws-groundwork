@@ -8,6 +8,16 @@ locals {
   }
 }
 
+resource "aws_cloudwatch_log_group" "log_group" {
+  name              = "/aws/api_gateway/${var.api_name}"
+  retention_in_days = 7
+
+  tags = {
+    Name    = var.api_name
+    Project = "groundwork"
+  }
+}
+
 resource "aws_apigatewayv2_api" "goundwork_api_gateway" {
   name          = var.api_name
   protocol_type = "HTTP"
@@ -56,6 +66,21 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.goundwork_api_gateway.id
   name        = "$default"
   auto_deploy = true
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.log_group.arn
+    format = jsonencode({
+      requestId          = "$context.requestId"
+      routeKey           = "$context.routeKey"
+      status             = "$context.status"
+      integrationStatus  = "$context.integrationStatus"
+      integrationLatency = "$context.integrationLatency"
+      responseLatency    = "$context.responseLatency"
+      responseLength     = "$context.responseLength"
+      sourceIp           = "$context.identity.sourceIp"
+      httpMethod         = "$context.httpMethod"
+      protocol           = "$context.protocol"
+    })
+  }
 
   default_route_settings {
     throttling_rate_limit  = var.throttling_rate_limit

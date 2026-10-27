@@ -10,6 +10,10 @@ Rather than following a prescriptive tutorial, the project starts with explicit 
 
 The goal is not to build the largest possible system, but to build a small, reproducible system that demonstrates sound engineering practices and provides opportunities to investigate real-world failure modes.
 
+### Current project status
+
+Phase 1 infrastructure and application implementation is complete. The Terraform-managed backend and static frontend have been deployed, the browser-to-CloudFront-to-API flow has been tested, and CloudWatch logging has been checked. The current local deployment workflow works. Remote Terraform state and GitHub Actions deployment automation are planned for Phase 2; asynchronous processing and email are planned for Phase 3.
+
 ## 1. Objective
 
 Build an AWS application that emphasizes practical understanding of core AWS fundamentals, secure architecture, and automated infrastructure management.
@@ -48,9 +52,9 @@ Build a simple web application that accepts user submissions, stores them in a r
 5. The application stores the submission in PostgreSQL on Amazon RDS.
 6. The application sends a confirmation email through Amazon SES.
 7. The application produces structured logs and metrics that support troubleshooting and operational visibility.
-8. In Phase 3, an analytics dashboard displays aggregated submission metrics.
+8. In Phase 3, the request processing is extended to asynchronous messaging and confirmation email.
 
-The initial implementation will use synchronous processing. In Phase 2, the processing workflow will be extended to use asynchronous messaging.
+The initial implementation uses synchronous processing. It will be extended to asynchronous processing in Phase 3.
 
 ---
 
@@ -118,13 +122,13 @@ The initial implementation will use synchronous processing. In Phase 2, the proc
 - Keep email delivery separate from database permissions.
 - Log delivery attempts and failures without unnecessarily exposing personal information.
 
-Full SES integration is part of Phase 2.
+Full SES integration is part of Phase 3.
 
 ### 3.5 Asynchronous messaging
 
 **Amazon SNS + Amazon SQS**
 
-Introduce asynchronous processing in Phase 2.
+Introduce asynchronous processing in Phase 3.
 
 Target workflow:
 
@@ -150,8 +154,7 @@ The implementation should cover:
 - Apply least-privilege policies to all applicable service identities.
 - Use separate roles for application execution, background workers, and infrastructure deployment where appropriate.
 - Use resource policies and network controls where supported and required.
-- Avoid long-lived AWS credentials in GitHub Actions.
-- Use GitHub Actions OIDC federation to assume a restricted AWS deployment role.
+- Avoid long-lived AWS credentials in GitHub Actions; Phase 2 uses OIDC federation to assume a restricted AWS deployment role.
 - Scope database authentication permissions to the intended RDS resource and database user.
 
 ### 3.7 Encryption
@@ -168,17 +171,15 @@ The implementation should cover:
 
 - Provision and manage all application infrastructure through Terraform.
 - Avoid manual console configuration of application resources.
-- Store Terraform state remotely in an S3 bucket.
-- Enable state bucket versioning and restrict access.
-- Use native S3 state locking with `use_lockfile`.
-- Provision the backend separately from the application infrastructure.
+- Use local Terraform state for the Phase 1 learning workflow.
+- Move to a separately provisioned S3 backend with versioning, restricted access, and native S3 state locking (`use_lockfile`) as part of Phase 2.
 - Document initial backend setup, deployment, updates, and teardown.
 
 ### 3.9 CI/CD
 
 **GitHub Actions**
 
-Implement the following workflows:
+Phase 2 automates the currently working local deployment workflow with GitHub Actions. Implement:
 
 **Pull request validation**
 
@@ -208,7 +209,7 @@ Implement the following workflows:
 - Capture structured application logs.
 - Record relevant processing stages and correlation IDs.
 - Monitor Lambda invocations, errors, duration, and throttling.
-- Inspect relevant queue metrics in Phase 2.
+- Inspect relevant queue metrics in Phase 3.
 - Avoid logging credentials, authentication tokens, or unnecessary personal information.
 
 **AWS CloudTrail**
@@ -217,23 +218,11 @@ Implement the following workflows:
 - Identify which principals performed relevant actions.
 - Understand the difference between application logs and AWS API audit events.
 
-### 3.11 Analytics
-
-**Amazon QuickSight — Stretch Goal**
-
-- Build a dashboard showing aggregated application metrics.
-- Include total submissions, submissions over time, and other useful aggregate measures.
-- Validate dashboard metrics against independent SQL queries.
-- Use an appropriately restricted data source and access model.
-- Document the networking, permissions, and cost implications of connecting QuickSight to RDS.
-
-QuickSight is optional and must not block completion of the core application.
-
 ---
 
 ## 4. Implementation Timeline
 
-### Phase 1 — Core application and infrastructure
+### Phase 1 — Core application and infrastructure (implementation complete)
 
 Scope:
 
@@ -243,21 +232,38 @@ Scope:
 - IAM database authentication.
 - VPC, subnets, route tables, security groups.
 - IAM least privilege and encryption.
-- Terraform remote state and infrastructure lifecycle.
-- GitHub Actions CI/CD using OIDC.
+- Terraform-managed infrastructure and application code.
+- A local deployment workflow that builds Lambda packages, applies Terraform, configures the frontend API URL, uploads website files, and invalidates CloudFront.
 - CloudWatch logs and metrics.
 - CloudTrail investigation of relevant AWS activity.
 - Synchronous database writes.
-- End-to-end testing and verified teardown.
+- End-to-end browser-to-API-to-database testing.
 
 Completion gate:
 
 - The application works from browser to database.
 - Infrastructure can be provisioned reproducibly through Terraform.
-- Deployment automation works without stored long-lived AWS credentials.
+- The local deployment workflow is tested.
 - Networking, IAM, database authentication, and logging can be explained and tested.
 
-### Phase 2 — Asynchronous processing and email
+### Phase 2 — GitHub Actions deployment automation
+
+Scope:
+
+- Provision and configure the Terraform S3 backend separately, including versioning, restricted access, and native S3 state locking.
+- Add GitHub Actions workflows for pull-request validation, Terraform plan, deployment, smoke testing, and deliberate teardown.
+- Authenticate to AWS from GitHub Actions using OIDC; do not store long-lived AWS credentials.
+- Automate Lambda package builds, frontend API configuration, S3 uploads, and CloudFront invalidations.
+- Ensure failed validation blocks deployment and teardown preserves the Terraform backend.
+
+Completion gate:
+
+- Pull requests run the required code and Terraform checks.
+- Deployment runs end to end using OIDC and no stored AWS access keys.
+- The deployed application passes an automated smoke test.
+- Teardown is deliberate, repeatable, and preserves the Terraform backend.
+
+### Phase 3 — Asynchronous processing and email
 
 Scope:
 
@@ -267,7 +273,7 @@ Scope:
 - SES confirmation emails.
 - Retry handling, dead-letter queues, and idempotency.
 - Correlation IDs and cross-service troubleshooting.
-- Updated IAM policies, networking, monitoring, and deployment workflows.
+- Updated IAM policies, networking, monitoring, and GitHub Actions deployment workflows.
 
 Completion gate:
 
@@ -277,25 +283,6 @@ Completion gate:
 - Duplicate events are handled safely.
 - Email delivery is tested subject to SES account restrictions.
 - The processing flow can be traced through application logs.
-
-### Phase 3 — Analytics
-
-Scope:
-
-- Define database aggregations and metrics.
-- Configure QuickSight connectivity and access.
-- Build the analytics dashboard.
-- Validate dashboard values against SQL results.
-- Review data access, permissions, and costs.
-- Update architecture documentation and known limitations.
-
-Completion gate:
-
-- The dashboard displays correct aggregated metrics.
-- The data access model is understood and documented.
-- Additional costs and production limitations are recorded.
-
-QuickSight remains a stretch goal; failure to complete it does not invalidate Phases 1 and 2.
 
 ---
 
@@ -325,8 +312,9 @@ The project is successful when the following outcomes are achieved.
 - Users can submit valid data through the API.
 - Valid records are stored correctly in PostgreSQL.
 - Invalid requests are rejected safely.
-- Phase 2 adds asynchronous persistence and email notification.
-- Phase 3 optionally provides accurate analytics.
+- Phase 1 provides synchronous persistence through the deployed browser/API/database path.
+- Phase 2 automates validation and deployment through GitHub Actions and OIDC.
+- Phase 3 adds asynchronous persistence and email notification.
 
 ### AWS fundamentals
 
@@ -338,7 +326,7 @@ The project is successful when the following outcomes are achieved.
 ### Infrastructure and deployment
 
 - Application infrastructure is managed through Terraform.
-- Shared remote state and locking work correctly.
+- Shared remote state and locking work correctly after Phase 2.
 - GitHub Actions performs validation and deployment through OIDC.
 - Failed checks block deployment.
 - Teardown is deliberate, repeatable, and does not destroy the Terraform backend.
@@ -373,3 +361,11 @@ The project is successful when the following outcomes are achieved.
 - No comprehensive backup restoration exercise.
 
 The priority is to develop practical competence in AWS networking, IAM, Terraform, CI/CD, security, observability, and troubleshooting. The number of deployed services is secondary to the ability to explain, reproduce, operate, and improve the architecture.
+
+## 8. Local deployment workflow
+
+Run `./deploy.sh` from the repository root to build the Lambda packages, initialize and apply Terraform, generate the frontend API configuration from the Terraform `api_url` output, upload the static files to the private S3 bucket, and invalidate the CloudFront cache.
+
+Locally, Terraform prompts for approval before applying infrastructure changes. In CI, set `CI=true` to enable non-interactive Terraform apply; CI should authenticate to AWS through OIDC rather than long-lived access keys.
+
+The generated `config.js` is written to a temporary staging directory and is not committed to source control. The Terraform root derives API Gateway CORS origins from the CloudFront domain output. The deploy identity needs permissions to manage the Terraform resources, upload/delete S3 objects, and create CloudFront invalidations.

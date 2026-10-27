@@ -89,6 +89,9 @@ module "groundwork_api_gateway" {
   source = "./api_gateway"
 
   api_name = "groundwork-api"
+  cors_allow_origins = [
+    "https://${module.groundwork_s3_cloudfront.cloudfront_domain_name}"
+  ]
 
   # Add a new endpoint by adding one entry here.
   routes = {
@@ -101,4 +104,8 @@ module "groundwork_api_gateway" {
       lambda_function_name = module.groundwork_reader.lambda_function_name
     }
   }
+}
+
+module "groundwork_s3_cloudfront" {
+  source = "./s3_cloudfront"
 }

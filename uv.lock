@@ -7,15 +7,19 @@ name = "aws-groundwork"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "boto3" },
     { name = "psycopg2-binary" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "boto3", specifier = ">=1.43.118" },
-    { name = "psycopg2-binary", specifier = ">=2.9.13" },
+[package.dev-dependencies]
+dev = [
+    { name = "boto3" },
 ]
+
+[package.metadata]
+requires-dist = [{ name = "psycopg2-binary", specifier = ">=2.9.13" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "boto3", specifier = ">=1.43.118" }]
 
 [[package]]
 name = "boto3"
